@@ -118,16 +118,16 @@ button.minus {
 
 </div>
 
-<div id="products"></div>
+<div id="products_def"></div>
 
 <script>
 const supabaseUrl = "https://wonwgpsupqutrujcphwr.supabase.co";
 const supabaseKey = "sb_publishable_6k-VYBGmKA9Jt1uZVlrPiA_QewueM51";
 const mySupabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-async function loadProducts() {
+async function loadProducts_def() {
   const { data, error } = await mySupabase
-    .from("products")
+    .from("products_def")
     .select("*")
     .order("name");
 
@@ -136,7 +136,7 @@ async function loadProducts() {
     return;
   }
 
-  const container = document.getElementById("products");
+  const container = document.getElementById("products_def");
   container.innerHTML = "";
 
   data.forEach(product => {
@@ -266,7 +266,7 @@ async function saveEdit(id) {
   }
 
   const { error } = await mySupabase
-    .from("products")
+    .from("products_def")
     .update({
       name: newName,
       jan: newJan,
@@ -281,18 +281,18 @@ async function saveEdit(id) {
 
   showToast("商品情報を更新しました");
   document.getElementById("edit-" + id).style.display = "none";
-  loadProducts();
+  loadProducts_def();
 }
 
 async function changeStock(id, newStock) {
   if (newStock < 0) newStock = 0;
 
   await mySupabase
-    .from("products")
+    .from("products_def")
     .update({ stock: newStock, updated_at: new Date() })
     .eq("id", id);
 
-  loadProducts();
+  loadProducts_def();
 }
 
 function copyJan(jan) {
@@ -323,7 +323,7 @@ async function addProduct() {
   }
 
   const { error } = await mySupabase
-    .from("products")
+    .from("products_def")
     .insert([{ name, jan, stock: 0, updated_at: new Date() }]);
 
   if (error) {
@@ -334,22 +334,22 @@ async function addProduct() {
   showToast("商品を追加しました");
   document.getElementById("new-name").value = "";
   document.getElementById("new-jan").value = "";
-  loadProducts();
+  loadProducts_def();
 }
 
 async function deleteProduct(id) {
   if (!confirm("本当に削除しますか？")) return;
 
   await mySupabase
-    .from("products")
+    .from("products_def")
     .delete()
     .eq("id", id);
 
   showToast("削除しました");
-  loadProducts();
+  loadProducts_def();
 }
 
-loadProducts();
+loadProducts_def();
 </script>
 
 </body>
