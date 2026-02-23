@@ -1,1 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>在庫管理</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<style>
+body {
+  font-family: sans-serif;
+  margin: 8px;
+  padding: 0;
+  background-color: #f9f9f9;
+}
+h2 {
+  text-align: center;
+  font-size: 26px;
+  margin-bottom: 15px;
+}
+.product {
+  border: 1px solid #ccc;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fff;
+  border-radius: 8px;
+}
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.product strong {
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* ★ 編集＆削除ボタン共通 */
+.edit-btn,
+.delete-btn {
+  font-size: 12px;
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+}
+
+.edit-btn {
+  background: #2196F3;
+}
+
+.delete-btn {
+  background: #777;
+}
+
+.stock-number {
+  font-size: 18px;
+}
+button {
+  font-size: 14px;
+  padding: 6px 0;
+  margin: 4px 2px;
+  width: 45%;
+  border-radius: 5px;
+  border: none;
+  background: #4CAF50;
+  color: white;
+}
+button.minus {
+  background: #f44336;
+}
+.zero {
+  color: red;
+  font-weight: bold;
+}
+.toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 12px;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 9999;
+}
+.toast.show {
+  opacity: 1;
+}
+</style>
+</head>
+
+<body>
+
+<h2>バック在庫</h2>
+
+<div style="background:#fff; padding:12px; margin-bottom:14px; border-radius:8px; border:1px solid #ccc;">
+
+  <input type="text" id="new-name"
+    placeholder="商品名"
+    style="width:100%; padding:6px; margin-bottom:6px; font-size:14px;">
+
+  <input type="text" id="new-jan"
+    placeholder="JANコード"
+    inputmode="numeric"
+    pattern="[0-9]*"
+    style="width:100%; padding:6px; margin-bottom:8px; font-size:14px;">
+
+  <button id="add-product" style="width:100%;">
+    ＋ 商品を追加
+  </button>
+
+</div>
+
+<div id="products"></div>
+
+<script>
+const supabaseUrl = "https://wonwgpsupqutrujcphwr.supabase.co";
+const supabaseKey = "sb_publishable_6k-VYBGmKA9Jt1uZVlrPiA_QewueM51";
+const mySupabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+async function loadProducts() {
+  const { data, error } = await mySupabase
+    .from("products")
+    .select("*")
+    .order("name");
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  const container = document.getElementById("products");
+  container.innerHTML = "";
+
+  data.forEach(product => {
+
+    const div = document.createElement("div");
+    div.className = "product";
+
+    div.innerHTML = `
+      <div class="top-row">
+        <strong class="copy" data-jan="${product.jan}">
+          ${product.name}
+        </strong>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <button class="edit-btn" data-id="${product.id}">✏️</button>
+          <button class="delete-btn" data-id="${product.id}">🗑</button>
+        </div>
+      </div>
+
+      <div id="edit-${product.id}" style="display:none; margin-top:8px;">
+        <input type="text"
+          id="name-${product.id}"
+          value="${product.name}"
+          placeholder="商品名"
+          style="width:100%; padding:4px; font-size:14px; margin-bottom:4px;">
+
+        <input type="text"
+          id="jan-${product.id}"
+          value="${product.jan}"
+          placeholder="JANコード"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          style="width:100%; padding:4px; font-size:14px; margin-bottom:6px;">
+
+        <div style="display:flex; gap:6px;">
+          <button class="save-btn" data-id="${product.id}" style="flex:1;">
+            保存
+          </button>
+          <button class="cancel-btn" data-id="${product.id}"
+            style="flex:1; background:#aaa;">
+            キャンセル
+          </button>
+        </div>
+      </div>
+
+      在庫:
+      <span class="stock-number ${product.stock === 0 ? 'zero' : ''}">
+        ${product.stock}
+      </span><br>
+
+      更新: ${new Date(product.updated_at).toLocaleString()}<br>
+
+      <div style="display:flex; justify-content: space-between; margin-top:6px;">
+        <button class="plus" data-id="${product.id}" data-stock="${product.stock}">
+          ＋
+        </button>
+        <button class="minus" data-id="${product.id}" data-stock="${product.stock}">
+          −
+        </button>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+
+  attachEvents();
+}
+
+/* 以降のJSはそのまま（変更なし） */
+
+function attachEvents() {
+
+  document.querySelectorAll(".cancel-btn").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.id;
+      document.getElementById("edit-" + id).style.display = "none";
+    };
+  });
+
+  document.querySelectorAll(".copy").forEach(el => {
+    el.onclick = () => copyJan(el.dataset.jan);
+  });
+
+  document.querySelectorAll(".edit-btn").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.id;
+      document.getElementById("edit-" + id).style.display = "block";
+      document.getElementById("name-" + id).focus();
+    };
+  });
+
+  document.querySelectorAll(".save-btn").forEach(btn => {
+    btn.onclick = () => saveEdit(btn.dataset.id);
+  });
+
+  document.querySelectorAll(".plus").forEach(btn => {
+    btn.onclick = () => {
+      changeStock(btn.dataset.id, Number(btn.dataset.stock) + 1);
+    };
+  });
+
+  document.querySelectorAll(".minus").forEach(btn => {
+    btn.onclick = () => {
+      changeStock(btn.dataset.id, Number(btn.dataset.stock) - 1);
+    };
+  });
+
+  document.querySelectorAll(".delete-btn").forEach(btn => {
+    btn.onclick = () => deleteProduct(btn.dataset.id);
+  });
+
+  const addBtn = document.getElementById("add-product");
+  if (addBtn) {
+    addBtn.onclick = addProduct;
+  }
+}
+
+/* 以下は変更なし */
+
+async function saveEdit(id) {
+  const newName = document.getElementById("name-" + id).value.trim();
+  const newJan  = document.getElementById("jan-" + id).value.trim();
+
+  if (!newName || !newJan) {
+    showToast("商品名とJANを入力してください");
+    return;
+  }
+
+  const { error } = await mySupabase
+    .from("products")
+    .update({
+      name: newName,
+      jan: newJan,
+      updated_at: new Date()
+    })
+    .eq("id", id);
+
+  if (error) {
+    showToast("更新エラー");
+    return;
+  }
+
+  showToast("商品情報を更新しました");
+  document.getElementById("edit-" + id).style.display = "none";
+  loadProducts();
+}
+
+async function changeStock(id, newStock) {
+  if (newStock < 0) newStock = 0;
+
+  await mySupabase
+    .from("products")
+    .update({ stock: newStock, updated_at: new Date() })
+    .eq("id", id);
+
+  loadProducts();
+}
+
+function copyJan(jan) {
+  navigator.clipboard.writeText(jan);
+  showToast("JANコードをコピーしました");
+}
+
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerText = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => toast.classList.add("show"), 10);
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 200);
+  }, 1200);
+}
+
+async function addProduct() {
+  const name = document.getElementById("new-name").value.trim();
+  const jan = document.getElementById("new-jan").value.trim();
+
+  if (!name || !jan) {
+    showToast("商品名とJANを入力してください");
+    return;
+  }
+
+  const { error } = await mySupabase
+    .from("products")
+    .insert([{ name, jan, stock: 0, updated_at: new Date() }]);
+
+  if (error) {
+    showToast("追加エラー");
+    return;
+  }
+
+  showToast("商品を追加しました");
+  document.getElementById("new-name").value = "";
+  document.getElementById("new-jan").value = "";
+  loadProducts();
+}
+
+async function deleteProduct(id) {
+  if (!confirm("本当に削除しますか？")) return;
+
+  await mySupabase
+    .from("products")
+    .delete()
+    .eq("id", id);
+
+  showToast("削除しました");
+  loadProducts();
+}
+
+loadProducts();
+</script>
+
+</body>
+</html>
